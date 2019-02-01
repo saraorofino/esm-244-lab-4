@@ -101,17 +101,89 @@ pred_df <- data.frame(time_seq, cell_pred)
 
 ggplot(cell_growth, aes(x = Time, y = CellCount)) +
   geom_point(color = "blue", size = 3) +
-  geom_line(data = pred_df, aes(x = time_seq, y = cell_pred), color = "orange", size = 1)
+  geom_line(data = pred_df, aes(x = time_seq, y = cell_pred), color = "orange", size = 1) + 
+  theme_light()
 
 # Note keep the color and size outside of aes() because they don't reference a specific variable and if you put them inside the aes() ggplot will try to make a legend for it 
 
 ```
 
 
+Panel Regression - First Shot 
+
+State: our entity variable 
+Year: our time variable 
+packpc: our dependent variable 
+avgprs: our predictor variable of interest 
+
+```{r}
+
+cigs_panel <- Cigarette %>% 
+  select(state, year, packpc, avgprs)
 
 
+# Look at how pricing is affecting purchasing:
+
+ggplot(cigs_panel, aes(x = avgprs, y = packpc, group = state)) +
+  geom_point(aes(color = state)) + 
+  geom_smooth(method = "lm", aes(color=state), se = FALSE, size = 0.2)
+
+# Overall general trends are decreasing for every state, average price looks to be affecting purchases in a pretty similar way across each state 
+
+# Just to see look at how years are affecting purchasing 
+
+ggplot(cigs_panel, aes(x = year, y = packpc), group = state) +
+  geom_point(aes(color=state)) +
+  geom_smooth(method = "lm", aes(color=state), se = FALSE, size = 0.2)
+
+# Also just general trends over time to reduce purchases of cigarettes (like campaigns or restrictions), probably should consider time fixed effects
+```
+
+Entity Fixed Effects model:
+
+```{r}
+# model = "within" for entity fixed effects model
+
+cigs_model <- plm(packpc ~ avgprs,
+                  data = cigs_panel,
+                  index = c("state", "year"),
+                  model = "within")
+
+cigs_model
+
+# Coefficient -0.32545
+# Interpretation: When we account for entity fixed affects, for every $1 in price we would expect to see a decrease in per capita cigarette purchases of 0.32545.
 
 
+# Robust Standard Error calculation: 
+
+coeftest(cigs_model, vcov. = vcovHC(cigs_model, type = "HC1"))
+
+# Std. Error metric gives you the robust standard error, notice that the estimate is slightly more conservative than the model prediction coefficient.
+```
+
+Add time fixed effects (such as):
+* Marketing campaigns 
+* Regulations for packaging and distribution 
+
+```{r}
+# Only need to add effect = "twoways" to consider time fixed effects in the model in addition to entity fixed effects 
+
+et_cigs_model <- plm(packpc ~ avgprs,
+                     data = cigs_panel,
+                     index = c("state", "year"),
+                     model = "within", 
+                     effect = "twoways")
+et_cigs_model
+
+# To compare the two models and see if it got better with the time fixed effect
+# H0: Model is not improved by adding time fixed effects 
+
+pFtest(et_cigs_model, cigs_model)
+
+# p-value < 0.001 --> reject null the hypothesis that it wasn't improved 
+# There is a significant additive effect of adding time fixed effects 
+```
 
 
 
