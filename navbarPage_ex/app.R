@@ -3,10 +3,13 @@ library(tidyverse)
 library(shinythemes)
 
 # Define UI for application that draws a histogram
+# Change shiny theme is this section of code - shinythemes and shinydashboard are two places to look for more themes  
+
 ui <- fluidPage(
   theme = shinytheme("cerulean"),
   
-  # Application title
+  # Application title - use navbarPage to have the panel with different tabs 
+  # Note that all of the tabPanel code is within the navbarPage code which is within the titlePanel code 
   titlePanel("244 Example: Old Faithful Geyser Data"),
   
    navbarPage("Here's a main title!",
