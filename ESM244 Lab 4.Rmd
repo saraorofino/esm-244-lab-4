@@ -7,5 +7,112 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+
 ```
+
+0. Attach packages 
+
+```{r, message=FALSE}
+
+library(tidyverse)
+library(plm)
+library(Ecdat)
+library(lmtest)
+library(car)
+
+```
+
+1. Part 1: Nonlinear least squares (logistic growth of bacteria)
+
+```{r}
+
+
+cell_growth <- read_csv("CellGrowth.csv")
+
+# Next look at data in ggplot: 
+
+ggplot(cell_growth, aes(x=Time, y=CellCount)) +
+  geom_point()
+
+# To use nonlinear logistic growth you have to specify the model and the beginning estimates 
+# Logistic growth equation Nt = A/(1+Be^(-rt))
+
+# Find estimates for logistic growth (A, B and r):
+# Estimate for carrying capacity (A) - 3700
+# If N0 is 2000, what is b? 
+   ## B = (K -N0)/N0 ~ 0.85
+# r = 0.1121
+
+BEstimate <- (3700-2000)/2000
+
+
+# Range where exponetial growth (r) is dominate is about 0-3 hours
+# Plot the natural log of cell count vs. time will give you r (linear relationship between ln(y) and t with r as the slope of that line)
+
+# Now, we're going to estimate r (growth rate):
+
+lag_phase <- cell_growth %>% 
+  filter(Time < 4)
+  
+ggplot(lag_phase, aes(x= Time, y = log(CellCount))) +
+  geom_point()
+  
+lm(log(CellCount) ~ Time, data = lag_phase)
+
+# r = 0.1121 -- this is using the coefficient for Time in the lm model 
+
+```
+
+Find A, B, and r using Gauss-Newton method for iterative convergence (nonlinear least squares):
+Use the nls() function:
+
+
+```{r}
+
+# First input your model function (in this case logistic growth), use start = list() to give the initial estimates for the parameters, give dataframe
+
+cell_fit <- nls(CellCount ~ A/(1+B*exp(-r*Time)),
+                start = list(A = 3700, B = 0.85, r = 0.1121),
+                data = cell_growth, 
+                trace = TRUE)
+
+# Use trace to see all the iterations r ran in order to find convergence (minimized least squares for the parameter values)
+
+cell_fit
+
+
+# Store actual parameters for use in the model - use the coefficients from the model in case the model changes
+A <- coef(cell_fit)[1]
+B <- coef(cell_fit)[2]
+r <- coef(cell_fit)[3]
+
+# Create a new sequence of time values (time_seq) to use to make predictions 
+
+time_seq <- seq(0,20, length=100) # use length for the total number of observations in that sequence
+
+# Plug that new sequence into the model with the parameters for A, B and r that we found:
+
+cell_pred <- A/(1+B*exp(-r*time_seq))
+
+# Bind that with time sequence data using data.frame():
+pred_df <- data.frame(time_seq, cell_pred)
+
+# Create a graph with the original data and our model predictions: 
+
+ggplot(cell_growth, aes(x = Time, y = CellCount)) +
+  geom_point(color = "blue", size = 3) +
+  geom_line(data = pred_df, aes(x = time_seq, y = cell_pred), color = "orange", size = 1)
+
+# Note keep the color and size outside of aes() because they don't reference a specific variable and if you put them inside the aes() ggplot will try to make a legend for it 
+
+```
+
+
+
+
+
+
+
+
+
 
